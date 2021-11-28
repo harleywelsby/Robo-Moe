@@ -1,8 +1,7 @@
 # Robo-Moe
 A robotic bartender for Discord serving up fresh drink ideas!
 
-Meet Robo-Moe:
-![moe](moebot.png "Moe")
+![banner](robomoe-banner.png "Banner")
 
 He's here to inspire you to get creative with your friday night drinks.
 
