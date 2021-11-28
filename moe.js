@@ -5,7 +5,7 @@
 // =============================================================
 
 import { Client, Intents, Message } from 'discord.js';
-import { token, alcohol_cfg, mixer_cfg, served_cfg, name_cfg, min_alcoholic, max_alcoholic, min_mixer, max_mixer } from './config.js';
+import { token, served_cfg, name_cfg, min_alcoholic, max_alcoholic, min_mixer, max_mixer } from './config.js';
 import { randroll, rollDrink, rollCursed, getShots } from './handling.js';
 
 //Lists to hold currently used ingredients
