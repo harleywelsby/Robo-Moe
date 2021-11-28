@@ -5,34 +5,13 @@
 // =============================================================
 
 import { Client, Intents, Message } from 'discord.js';
+import { token, alcohol_cfg, mixer_cfg, served_cfg, name_cfg, min_alcoholic, max_alcoholic, min_mixer, max_mixer } from './config.js';
+import { randroll, rollDrink, rollCursed, getShots } from './handling.js';
 
-//IMPORTANT VARIABLES
-var min_ingredients = 2;
-var max_ingredients = 5;
-var min_alc_ingredients = 1;
-var max_alc_ingredients = 3;
-var min_parts = 1;
-var max_parts = 4;
-
-//Clear these
+//Lists to hold currently used ingredients
 var alc_ingredients = [];
-var nonalc_ingredients = [];
-
-//DATA
-var alcohol = ['vodka','dark rum','white rum','malibu','tequila','bourbon','jack daniels','whisky','peach schnapps','apple sourz'];
-var mixers = ['cranberry juice','pineapple juice','apple juice','orange juice','bitters','lime juice','lemon juice'];
-var served = ['served on the rocks','served neat','shaken, not stirred','on fire.','screaming','banned in 15 states','sentient'];
-
+var mix_ingredients = [];
 var custom = [];
-
-var names = ['Ancient', 'Mariner','Bacardi','Between', 'the', 'Sheets','Blow', 'Skull', 'Off','Blue', 'Hawaii','Brass', 'Monkey',
-             'Bumbo','Bushwacker','Caribou', 'Lou','Cobras', 'Fang','Cojito','Cremat','Cuba', 'Libre','Cuban', 'Sunset','Daiquiri',
-             'Dark', 'Stormy','El', 'Presidente','Fish', 'House', 'Punch','Flaming', 'Doctor', 'Pepper','Flaming', 'volcano','Fluffy', 
-             'Critter','Fluffy', 'duck','Grog','Gunfire','Hoppel', 'poppel','Hot', 'buttered', 'rum','Hurricane','Jagertee','Long', 
-             'Island', 'Iced', 'Tea','Macua','Mai', 'Tai','Mojito','Mr', 'Bali', 'Hai','Painkiller','Pina', 'colada','Planters', 
-             'Punch','QB', 'Cooler','Royal', 'Bermuda', 'Cocktail','Rum', 'Swizzle','Suffering', 'Bastard','Sumatra', 'Kula','Test', 
-             'Pilot','Ti', 'Punch','Tom', 'and', 'Jerry','Tschunk','Yellow', 'Bird','Zombie','Undefined'];
-
 
 //INITIALIZATIONS
 const bot = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
@@ -43,27 +22,7 @@ bot.on('ready', () => {
     bot.user.setActivity('you get drunk', { type: 'WATCHING' });
 });
 
-function rollDrink(alc) {
-    return alc ? alcohol[Math.floor(Math.random()*alcohol.length)] : mixers[Math.floor(Math.random()*(alcohol.length-1))];
-}
-
-function rollCursed() {
-    var random = Math.floor(Math.random()*3);
-    if(random == 0) {
-        return alcohol[Math.floor(Math.random()*alcohol.length)]
-    }
-    else if(random == 1) {
-        return mixers[Math.floor(Math.random()*mixers.length)]
-    }
-    else {
-        return custom[Math.floor(Math.random()*custom.length)]
-    }
-}
-
-function getShots() {
-    return min_parts + (Math.random() * max_parts);
-}
-
+//Recursive method to stop duplicate ingredients
 function recursiveDrinkCheck(alc) {
     var drink = rollDrink(alc);
     if(alc) {
@@ -75,17 +34,18 @@ function recursiveDrinkCheck(alc) {
         }
     }
     else {
-        if (nonalc_ingredients.includes(drink)) {
+        if (mix_ingredients.includes(drink)) {
             recursiveDrinkCheck(false);
         }
         else {
-            nonalc_ingredients.push(drink);
+            mix_ingredients.push(drink);
         }
     }
 }
 
+//Simple recursive method to stop duplicate ingredients
 function recursedCheck() {
-    var drink = rollCursed();
+    var drink = rollCursed(custom);
     if (alc_ingredients.includes(drink)) {
         recursedCheck();
     }
@@ -95,89 +55,108 @@ function recursedCheck() {
 }
 
 //Make a drink
+function drink(msg) {
+    //Roll number of ingredients
+    var num_alc = Math.floor( min_alcoholic() + ( Math.random() * max_alcoholic() ) );
+    var num_mixer = Math.floor( min_mixer() + ( Math.random() * max_mixer() ) );
+    var howmany = 0;
+
+    //Do alcoholic ingredients, then the rest
+    for(howmany = 0; howmany < num_alc; howmany++) {
+        recursiveDrinkCheck(true);
+    }
+    for(howmany = howmany; howmany < num_mixer; howmany++) {
+        recursiveDrinkCheck(false);
+    }
+
+    //Construct message
+    var output = 'This one\'s called the \" ';
+
+    //Do name
+    var num_words = Math.floor(1 + Math.random()*3);
+    for(let i=0; i<num_words; i++) {
+        output += name_cfg()[randroll(name_cfg())];
+        output += ' ';
+    }
+    output += '\"!\n\n';
+
+    //Do drink
+    for(let i=0; i < alc_ingredients.length; i++) {
+        output += Math.floor(getShots()) + ' parts ' + alc_ingredients[i] + '\n';
+    }
+    for(let i=0; i < mix_ingredients.length; i++) {
+        output += Math.floor(getShots()) + ' parts ' + mix_ingredients[i] + '\n';
+    }
+
+    //Add an optional garnish / presentation instruction
+    var how_served = Math.floor(Math.random()*4);
+    if(how_served < 2) {
+        output += '\nThis drink is ' + served_cfg()[randroll(served_cfg())] + '\n';
+    }
+
+    //Send the message
+    msg.reply(output);
+
+    //Reset lists
+    alc_ingredients = [];
+    mix_ingredients = [];
+}
+
+function cursed(msg) {
+    //Calc number of ingredients
+    var num_ingredients = Math.floor((min_mixer() + (Math.random() * (max_mixer() + max_alcoholic()))));
+
+    //Roll ingredients avoiding duplicates
+    for(let i=0; i<num_ingredients; i++) {
+        recursedCheck();
+    }
+
+    //Construct message
+    var output = 'This one\'s called the \" ';
+
+    //Do name
+    var num_words = Math.floor(1 + Math.random()*3);
+    for(let i=0; i<num_words; i++) {
+        output += name_cfg()[randroll(name_cfg())];
+        output += ' ';
+    }
+    output += '\"!\n\n';
+    
+    //Do drink
+    for(let i=0; i<alc_ingredients.length; i++) {
+        output += Math.floor(getShots()) + ' parts ' + alc_ingredients[i] + '\n';
+    }
+
+    //Add an optional garnish / presentation instruction
+    var how_served = Math.floor(Math.random()*4);
+    if(how_served < 2) {
+        output += '\nThis drink is ' + served_cfg()[randroll(served_cfg())] + '\n';
+    }
+
+    msg.reply(output);
+    alc_ingredients = [];
+}
+
+//Make a drink
 bot.on('messageCreate', msg => {
+    
+    //Make a drink
     if (msg.content.startsWith('!drink')) {
-        
-        var num_alc_ingredients = Math.floor( min_alc_ingredients + ( Math.random() * max_alc_ingredients ) );
-        var num_ingredients = Math.floor( min_ingredients + ( Math.random() * max_ingredients ) );
-        var howmany = 0;
-        //var alc_ingredients = [];
-        //var nonalc_ingredients = [];
-
-        for(howmany = 0; howmany<num_alc_ingredients; howmany++) {
-            recursiveDrinkCheck(true);
-        }
-        for(howmany = howmany; howmany<num_ingredients; howmany++) {
-            recursiveDrinkCheck(false);
-        }
-
-        var output = 'This one\'s called the \" ';
-
-        //Do name
-        var num_words = Math.floor(1+Math.random()*3);
-        for(let i=0; i<num_words; i++) {
-            output += names[Math.floor(Math.random()*names.length)];
-            output += ' ';
-        }
-        output += '\"!\n\n';
-        
-        //Do drink
-        for(let i=0; i<alc_ingredients.length; i++) {
-            output += Math.floor(getShots()) + ' parts ' + alc_ingredients[i] + '\n';
-        }
-        for(let i=0; i<nonalc_ingredients.length; i++) {
-            output += Math.floor(getShots()) + ' parts ' + nonalc_ingredients[i] + '\n';
-        }
-
-        var how_served = Math.floor(Math.random()*4);
-        if(how_served < 2) {
-            output += '\nThis drink is ' + served[Math.floor(Math.random()*served.length)] + '\n';
-        }
-
-        msg.reply(output);
-
-        alc_ingredients = [];
-        nonalc_ingredients = [];
+        drink(msg);
     }
 
+    //Make a cursed drink (Custom ingredients)
     else if(msg.content.startsWith('!cursed')) {
-        var num_ingredients = Math.floor( min_ingredients + ( Math.random() * max_ingredients ) );
-
-        for(let i=0; i<num_ingredients; i++) {
-            recursedCheck();
-        }
-
-        var output = 'This one\'s called the \" ';
-
-        //Do name
-        var num_words = Math.floor(1+Math.random()*3);
-        for(let i=0; i<num_words; i++) {
-            output += names[Math.floor(Math.random()*names.length)];
-            output += ' ';
-        }
-        output += '\"!\n\n';
-        
-        //Do drink
-        for(let i=0; i<alc_ingredients.length; i++) {
-            output += Math.floor(getShots()) + ' parts ' + alc_ingredients[i] + '\n';
-        }
-
-        var how_served = Math.floor(Math.random()*4);
-        if(how_served < 2) {
-            output += '\nThis drink is ' + served[Math.floor(Math.random()*served.length)] + '\n';
-        }
-
-        msg.reply(output);
-
-        alc_ingredients = [];
-        nonalc_ingredients = [];
+        cursed(msg);
     }
-
+    
+    //Add an ingredient
     else if(msg.content.startsWith('!add')) {
         custom.push(msg.content.split(' ')[1]);
         msg.reply('Added \"' + msg.content.split(' ')[1] + '\" successfully');
     }
 
+    //See the custom list of ingredients
     else if(msg.content.startsWith('!custom')) {
         var output = 'The custom ingredients are: \n\n';
         for(let i=0; i<custom.length-1; i++) {
@@ -186,6 +165,7 @@ bot.on('messageCreate', msg => {
         output += 'and ' + custom[custom.length-1] + '!';
         msg.reply(output);
     }
+
 });
 
-bot.login(config.token);
+bot.login(token());
