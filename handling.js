@@ -27,6 +27,10 @@ export function rollCursed(custom) {
     }
 }
 
+export function rollNye(custom) {
+    return custom[randroll(custom)];
+}
+
 //Get number of shots
 export function getShots() {
     return min_parts() + (Math.random() * max_parts());
